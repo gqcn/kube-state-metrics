@@ -1794,11 +1794,8 @@ func wrapPodFunc(f func(*v1.Pod) *metric.Family) func(interface{}) *metric.Famil
 				m.LabelKeys = append(m.LabelKeys, "khaos_instance")
 				m.LabelValues = append(m.LabelValues, khaosInstanceName)
 			}
-			// 注入云巢业务识别Label，标识该Pod属于业务Pod
+			// 注入云巢应用识别Label
 			if khaosAppName != "" {
-				m.LabelKeys = append(m.LabelKeys, "khaos_app")
-				m.LabelValues = append(m.LabelValues, khaosAppName)
-				// 兼容旧版不带khaos_前缀的label
 				m.LabelKeys = append(m.LabelKeys, "app_name")
 				m.LabelValues = append(m.LabelValues, khaosAppName)
 			}
