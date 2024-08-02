@@ -1764,12 +1764,44 @@ func createPodSchedulerNameFamilyGenerator() generator.FamilyGenerator {
 
 func wrapPodFunc(f func(*v1.Pod) *metric.Family) func(interface{}) *metric.Family {
 	return func(obj interface{}) *metric.Family {
-		pod := obj.(*v1.Pod)
-
-		metricFamily := f(pod)
+		var (
+			pod          = obj.(*v1.Pod)
+			metricFamily = f(pod)
+			// 云巢应用识别Label
+			khaosAppName string
+			// 注入云巢业务识别Label，标识该Pod属于业务Pod
+			khaosInstanceName, _ = pod.Labels["cluster.khaos.tencentcloud.com/name"]
+		)
+		khaosAppName, _ = pod.Labels["k8s_app"]
+		if khaosAppName == "" {
+			khaosAppName, _ = pod.Labels["app"]
+		}
+		if khaosAppName == "" {
+			khaosAppName, _ = pod.Labels["component"]
+		}
+		if khaosAppName == "" {
+			khaosAppName, _ = pod.Labels["app.kubernetes.io/instance"]
+		}
 
 		for _, m := range metricFamily.Metrics {
-			m.LabelKeys, m.LabelValues = mergeKeyValues(descPodLabelsDefaultLabels, []string{pod.Namespace, pod.Name, string(pod.UID)}, m.LabelKeys, m.LabelValues)
+			m.LabelKeys, m.LabelValues = mergeKeyValues(
+				descPodLabelsDefaultLabels, []string{
+					pod.Namespace, pod.Name, string(pod.UID),
+				}, m.LabelKeys, m.LabelValues,
+			)
+			// 注入云巢业务识别Label，标识该Pod属于业务Pod
+			if khaosInstanceName != "" {
+				m.LabelKeys = append(m.LabelKeys, "khaos_instance")
+				m.LabelValues = append(m.LabelValues, khaosInstanceName)
+			}
+			// 注入云巢业务识别Label，标识该Pod属于业务Pod
+			if khaosAppName != "" {
+				m.LabelKeys = append(m.LabelKeys, "khaos_app")
+				m.LabelValues = append(m.LabelValues, khaosAppName)
+				// 兼容旧版不带khaos_前缀的label
+				m.LabelKeys = append(m.LabelKeys, "app_name")
+				m.LabelValues = append(m.LabelValues, khaosAppName)
+			}
 		}
 
 		return metricFamily
